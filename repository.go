@@ -20,7 +20,7 @@
 package queue
 
 import (
-	"github.com/whiteblock/genesis/pkg/externals"
+	"github.com/whiteblock/amqp/externals"
 )
 
 //AMQPRepository represents functions for connecting to a AMQP provider
