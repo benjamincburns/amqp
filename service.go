@@ -20,6 +20,7 @@
 package queue
 
 import (
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
 )
@@ -51,17 +52,62 @@ func NewAMQPService(
 	return &qpService{repo: repo, conf: conf, log: log}
 }
 
+func (as qpService) isConnectionError(err error) bool {
+	amqpErr, ok := err.(amqp.Error)
+	if !ok {
+		as.log.Trace("error is not a connection error")
+		return false
+	}
+	return amqpErr.Code == amqp.ChannelError
+}
+
+func (as qpService) attemptReconnect() (out error) {
+	for i := 0; i < as.conf.Queue.ReconnRetries; i++ {
+		conn, err := OpenAMQPConnection(as.conf.Endpoint)
+		if err != nil {
+			as.log.WithFields(logrus.Fields{
+				"error": err,
+				"host":  as.conf.Endpoint.QueueHost,
+				"try":   i,
+			}).Warn("could not connect to Queue")
+			out = err
+			continue
+		}
+		as.repo.SwapConn(conn)
+		return nil
+	}
+	return errors.Wrap(out, "could not reconnect to queue")
+}
+
 func (as qpService) Send(pub amqp.Publishing) error {
 	ch, err := as.repo.GetChannel()
 	if err != nil {
-		return err
+		if !as.isConnectionError(err) {
+			return err
+		}
+		as.log.WithField("queue", as.conf.QueueName).Info("attempting to reconnect")
+		err = as.attemptReconnect()
+		if err != nil {
+			as.log.WithFields(logrus.Fields{
+				"queue": as.conf.QueueName,
+				"error": err}).Error("failed to reconnect")
+			return err
+		}
+		ch, err = as.repo.GetChannel()
+		if err != nil {
+			as.log.WithFields(logrus.Fields{
+				"queue": as.conf.QueueName,
+				"error": err}).Error("failed a second time")
+			return err
+		}
 	}
 	defer ch.Close()
 	as.log.WithFields(logrus.Fields{
 		"exchange": as.conf.Publish.Exchange,
 		"queue":    as.conf.QueueName,
 	}).Trace("publishing a message")
-	return ch.Publish(as.conf.Publish.Exchange, as.conf.QueueName, as.conf.Publish.Mandatory, as.conf.Publish.Immediate, pub)
+	return ch.Publish(as.conf.Publish.Exchange, as.conf.QueueName,
+		as.conf.Publish.Mandatory, as.conf.Publish.Immediate, pub)
 }
 
 // Consume immediately starts delivering queued messages.

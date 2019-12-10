@@ -27,6 +27,7 @@ import (
 type AMQPRepository interface {
 	GetChannel() (externals.AMQPChannel, error)
 	RejectDelivery(msg externals.AMQPDelivery, requeue bool) error
+	SwapConn(conn externals.AMQPConnection)
 }
 
 type amqpRepository struct {
@@ -44,4 +45,9 @@ func (ar amqpRepository) GetChannel() (externals.AMQPChannel, error) {
 
 func (ar amqpRepository) RejectDelivery(msg externals.AMQPDelivery, requeue bool) error {
 	return msg.Reject(requeue)
+}
+
+func (ar *amqpRepository) SwapConn(conn externals.AMQPConnection) {
+	ar.conn.Close()
+	ar.conn = conn
 }
