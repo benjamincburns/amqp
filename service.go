@@ -83,6 +83,9 @@ func (as qpService) Send(pub amqp.Publishing) error {
 	ch, err := as.repo.GetChannel()
 	if err != nil {
 		if !as.isConnectionError(err) {
+			as.log.WithFields(logrus.Fields{
+				"queue": as.conf.QueueName,
+				"error": err}).Error("had an unrecoverable error")
 			return err
 		}
 		as.log.WithField("queue", as.conf.QueueName).Info("attempting to reconnect")
