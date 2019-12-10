@@ -1,6 +1,6 @@
 GO111MODULE=on
 
-DIRECTORIES= externals
+DIRECTORIES=
 MOCKS=$(foreach x, $(DIRECTORIES), mocks/$(x))
 
 .PHONY: test test_race lint vet get mocks clean-mocks 

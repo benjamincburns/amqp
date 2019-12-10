@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"github.com/whiteblock/amqp/mocks"
-	externalsMocks "github.com/whiteblock/amqp/mocks/externals"
 
 	"github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
@@ -55,7 +54,7 @@ func TestAMQPService_Consume(t *testing.T) {
 			Args:      nil,
 		},
 	}
-	ch := new(externalsMocks.AMQPChannel)
+	ch := new(mocks.AMQPChannel)
 
 	ch.On("Consume", mock.Anything, mock.Anything, mock.Anything,
 		mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Run(
@@ -90,7 +89,7 @@ func TestAMQPService_Requeue_Success(t *testing.T) {
 	}
 	newMsg := amqp.Publishing{}
 
-	ch := new(externalsMocks.AMQPChannel)
+	ch := new(mocks.AMQPChannel)
 	ch.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			require.Len(t, args, 5)
@@ -123,7 +122,7 @@ func TestAMQPService_Requeue_Success(t *testing.T) {
 }
 
 func TestAMQPService_Requeue_RejectDelivery_Failure(t *testing.T) {
-	ch := new(externalsMocks.AMQPChannel)
+	ch := new(mocks.AMQPChannel)
 	ch.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	ch.On("Tx").Return(nil).Once()
 	ch.On("Close").Return(nil).Once()
@@ -155,7 +154,7 @@ func TestAMQPService_Requeue_GetChannel_Failure(t *testing.T) {
 }
 
 func TestAMQPService_Requeue_Tx_Failure(t *testing.T) {
-	ch := new(externalsMocks.AMQPChannel)
+	ch := new(mocks.AMQPChannel)
 	ch.On("Tx").Return(fmt.Errorf("error")).Once()
 	ch.On("Close").Return(nil).Once()
 
@@ -172,7 +171,7 @@ func TestAMQPService_Requeue_Tx_Failure(t *testing.T) {
 }
 
 func TestAMQPService_Requeue_Publish_Failure(t *testing.T) {
-	ch := new(externalsMocks.AMQPChannel)
+	ch := new(mocks.AMQPChannel)
 	ch.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
 		fmt.Errorf("error")).Once()
 	ch.On("Tx").Return(nil).Once()
@@ -203,7 +202,7 @@ func TestAmqpService_CreateQueue(t *testing.T) {
 		},
 	}
 
-	ch := new(externalsMocks.AMQPChannel)
+	ch := new(mocks.AMQPChannel)
 	ch.On("QueueDeclare", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(amqp.Queue{}, nil).Run(
 		func(args mock.Arguments) {
 			require.Len(t, args, 6)
@@ -234,7 +233,7 @@ func TestAMQPService_Send_GetChannel_Failure(t *testing.T) {
 }
 
 func TestAMQPService_Send_Success(t *testing.T) {
-	ch := new(externalsMocks.AMQPChannel)
+	ch := new(mocks.AMQPChannel)
 	ch.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	ch.On("Close").Return(nil).Once()
 

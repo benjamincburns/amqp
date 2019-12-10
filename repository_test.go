@@ -22,7 +22,7 @@ package queue
 import (
 	"testing"
 
-	externalsMock "github.com/whiteblock/amqp/mocks/externals"
+	"github.com/whiteblock/amqp/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -30,12 +30,12 @@ import (
 )
 
 func TestNewAMQPRepository(t *testing.T) {
-	repo := NewAMQPRepository(new(externalsMock.AMQPConnection))
+	repo := NewAMQPRepository(new(mocks.AMQPConnection))
 	assert.NotNil(t, repo)
 }
 
 func TestAMQPRepository_GetChannel(t *testing.T) {
-	conn := new(externalsMock.AMQPConnection)
+	conn := new(mocks.AMQPConnection)
 	conn.On("Channel").Return(nil, nil).Once()
 	repo := NewAMQPRepository(conn)
 
@@ -45,13 +45,13 @@ func TestAMQPRepository_GetChannel(t *testing.T) {
 }
 
 func TestAMQPRepository_RejectDelivery(t *testing.T) {
-	msg := new(externalsMock.AMQPDelivery)
+	msg := new(mocks.AMQPDelivery)
 	msg.On("Reject", mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			require.Len(t, args, 1)
 			assert.Equal(t, true, args.Get(0))
 		}).Once()
-	conn := new(externalsMock.AMQPConnection)
+	conn := new(mocks.AMQPConnection)
 	repo := NewAMQPRepository(conn)
 	require.NotNil(t, repo)
 
