@@ -38,19 +38,20 @@ type AMQPConfig struct {
 	Endpoint AMQPEndpoint
 }
 
+//NewAMQPConfig creates a new instance of AMQPConfig from viper
 func NewAMQPConfig(v *viper.Viper) (out AMQPConfig, err error) {
 	out.Queue, err = NewQueue(v)
-	if err != nil{
+	if err != nil {
 		return
 	}
 
 	out.Consume, err = NewConsume(v)
-	if err != nil{
+	if err != nil {
 		return
 	}
 
 	out.Publish, err = NewPublish(v)
-	if err != nil{
+	if err != nil {
 		return
 	}
 
@@ -116,8 +117,8 @@ type Publish struct {
 	Exchange  string `mapstructure:"exchange"`
 }
 
-//GetPublish gets Publish from the values in viper
-func NewPublish(v *viper.Viper) (out Publish,err error) {
+//NewPublish gets Publish from the values in viper
+func NewPublish(v *viper.Viper) (out Publish, err error) {
 	return out, v.Unmarshal(&out)
 }
 
@@ -131,11 +132,12 @@ type AMQPEndpoint struct {
 	QueueVHost    string `mapstructure:"queueVHost"`
 }
 
-//GetAMQPEndpoint gets AMQPEndpoint from the values in viper
-func GetAMQPEndpoint(v *viper.Viper) (out AMQPEndpoint, err error) {
+// NewEndpoint gets AMQPEndpoint from the values in viper
+func NewEndpoint(v *viper.Viper) (out AMQPEndpoint, err error) {
 	return out, v.Unmarshal(&out)
 }
 
+//SetConfig initializes viper with the defaults and env bindings
 func SetConfig(v *viper.Viper) {
 	/** START Queue **/
 	v.BindEnv("queueDurable", "QUEUE_DURABLE")

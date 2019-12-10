@@ -45,4 +45,3 @@ func (ar amqpRepository) GetChannel() (externals.AMQPChannel, error) {
 func (ar amqpRepository) RejectDelivery(msg externals.AMQPDelivery, requeue bool) error {
 	return msg.Reject(requeue)
 }
-

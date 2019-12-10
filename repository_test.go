@@ -20,11 +20,13 @@
 package queue
 
 import (
+	"testing"
+
+	externalsMock "github.com/whiteblock/amqp/mocks/externals"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	externalsMock "github.com/whiteblock/genesis/mocks/pkg/externals"
-	"testing"
 )
 
 func TestNewAMQPRepository(t *testing.T) {

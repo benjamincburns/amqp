@@ -23,8 +23,8 @@ import (
 	"fmt"
 	"testing"
 
-	externalsMocks "github.com/whiteblock/amqp/mocks/pkg/externals"
-	"github.com/whiteblock/amqp/mocks/pkg/repository"
+	"github.com/whiteblock/amqp/mocks"
+	externalsMocks "github.com/whiteblock/amqp/mocks/externals"
 
 	"github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
@@ -34,7 +34,7 @@ import (
 )
 
 func TestNewAMQPService(t *testing.T) {
-	conf := config.AMQP{
+	conf := AMQPConfig{
 		QueueName: "test queue",
 	}
 	repo := new(mocks.AMQPRepository)
@@ -44,9 +44,9 @@ func TestNewAMQPService(t *testing.T) {
 }
 
 func TestAMQPService_Consume(t *testing.T) {
-	conf := config.AMQP{
+	conf := AMQPConfig{
 		QueueName: "test queue",
-		Consume: config.Consume{
+		Consume: Consume{
 			Consumer:  "test",
 			AutoAck:   false,
 			Exclusive: false,
@@ -63,7 +63,7 @@ func TestAMQPService_Consume(t *testing.T) {
 			assert.True(t, args[0:len(args)-2].Is(conf.QueueName, conf.Consume.Consumer, conf.Consume.AutoAck,
 				conf.Consume.Exclusive, conf.Consume.NoLocal, conf.Consume.NoWait))
 		}).Once()
-	repo := new(repoMocks.AMQPRepository)
+	repo := new(mocks.AMQPRepository)
 	repo.On("GetChannel").Return(ch, nil).Once()
 
 	serv := NewAMQPService(conf, repo, logrus.New())
@@ -76,9 +76,9 @@ func TestAMQPService_Consume(t *testing.T) {
 }
 
 func TestAMQPService_Requeue_Success(t *testing.T) {
-	conf := config.AMQP{
+	conf := AMQPConfig{
 		QueueName: "test queue",
-		Publish: config.Publish{
+		Publish: Publish{
 			Mandatory: true,
 			Immediate: true,
 		},
@@ -104,7 +104,7 @@ func TestAMQPService_Requeue_Success(t *testing.T) {
 	ch.On("Close").Return(nil).Once()
 	ch.On("TxCommit").Return(nil).Once()
 
-	repo := new(repoMocks.AMQPRepository)
+	repo := new(mocks.AMQPRepository)
 	repo.On("GetChannel").Return(ch, nil).Once()
 	repo.On("RejectDelivery", mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
@@ -129,11 +129,11 @@ func TestAMQPService_Requeue_RejectDelivery_Failure(t *testing.T) {
 	ch.On("Close").Return(nil).Once()
 	ch.On("TxRollback").Return(nil).Once()
 
-	repo := new(repoMocks.AMQPRepository)
+	repo := new(mocks.AMQPRepository)
 	repo.On("GetChannel").Return(ch, nil).Once()
 	repo.On("RejectDelivery", mock.Anything, mock.Anything).Return(fmt.Errorf("error")).Once()
 
-	serv := NewAMQPService(config.AMQP{}, repo, logrus.New())
+	serv := NewAMQPService(AMQPConfig{}, repo, logrus.New())
 
 	err := serv.Requeue(amqp.Delivery{}, amqp.Publishing{})
 	assert.Error(t, err)
@@ -143,10 +143,10 @@ func TestAMQPService_Requeue_RejectDelivery_Failure(t *testing.T) {
 }
 
 func TestAMQPService_Requeue_GetChannel_Failure(t *testing.T) {
-	repo := new(repoMocks.AMQPRepository)
+	repo := new(mocks.AMQPRepository)
 	repo.On("GetChannel").Return(nil, fmt.Errorf("error")).Once()
 
-	serv := NewAMQPService(config.AMQP{}, repo, logrus.New())
+	serv := NewAMQPService(AMQPConfig{}, repo, logrus.New())
 
 	err := serv.Requeue(amqp.Delivery{}, amqp.Publishing{})
 	assert.Error(t, err)
@@ -159,10 +159,10 @@ func TestAMQPService_Requeue_Tx_Failure(t *testing.T) {
 	ch.On("Tx").Return(fmt.Errorf("error")).Once()
 	ch.On("Close").Return(nil).Once()
 
-	repo := new(repoMocks.AMQPRepository)
+	repo := new(mocks.AMQPRepository)
 	repo.On("GetChannel").Return(ch, nil).Once()
 
-	serv := NewAMQPService(config.AMQP{}, repo, logrus.New())
+	serv := NewAMQPService(AMQPConfig{}, repo, logrus.New())
 
 	err := serv.Requeue(amqp.Delivery{}, amqp.Publishing{})
 	assert.Error(t, err)
@@ -179,10 +179,10 @@ func TestAMQPService_Requeue_Publish_Failure(t *testing.T) {
 	ch.On("Close").Return(nil).Once()
 	ch.On("TxRollback").Return(nil).Once()
 
-	repo := new(repoMocks.AMQPRepository)
+	repo := new(mocks.AMQPRepository)
 	repo.On("GetChannel").Return(ch, nil).Once()
 
-	serv := NewAMQPService(config.AMQP{}, repo, logrus.New())
+	serv := NewAMQPService(AMQPConfig{}, repo, logrus.New())
 
 	err := serv.Requeue(amqp.Delivery{}, amqp.Publishing{})
 	assert.Error(t, err)
@@ -192,9 +192,9 @@ func TestAMQPService_Requeue_Publish_Failure(t *testing.T) {
 }
 
 func TestAmqpService_CreateQueue(t *testing.T) {
-	conf := config.AMQP{
+	conf := AMQPConfig{
 		QueueName: "test queue",
-		Queue: config.Queue{
+		Queue: Queue{
 			Durable:    true,
 			AutoDelete: false,
 			Exclusive:  false,
@@ -210,7 +210,7 @@ func TestAmqpService_CreateQueue(t *testing.T) {
 			assert.True(t, args[0:5].Is(conf.QueueName, conf.Queue.Durable, conf.Queue.AutoDelete, conf.Queue.Exclusive, conf.Queue.NoWait, conf.Queue.Args))
 		}).Once()
 	ch.On("Close").Return(nil).Once()
-	repo := new(repoMocks.AMQPRepository)
+	repo := new(mocks.AMQPRepository)
 	repo.On("GetChannel").Return(ch, nil).Once()
 	serv := NewAMQPService(conf, repo, logrus.New())
 
@@ -222,10 +222,10 @@ func TestAmqpService_CreateQueue(t *testing.T) {
 }
 
 func TestAMQPService_Send_GetChannel_Failure(t *testing.T) {
-	repo := new(repoMocks.AMQPRepository)
+	repo := new(mocks.AMQPRepository)
 	repo.On("GetChannel").Return(nil, fmt.Errorf("error")).Once()
 
-	serv := NewAMQPService(config.AMQP{}, repo, logrus.New())
+	serv := NewAMQPService(AMQPConfig{}, repo, logrus.New())
 
 	err := serv.Send(amqp.Publishing{})
 	assert.Error(t, err)
@@ -238,10 +238,10 @@ func TestAMQPService_Send_Success(t *testing.T) {
 	ch.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	ch.On("Close").Return(nil).Once()
 
-	repo := new(repoMocks.AMQPRepository)
+	repo := new(mocks.AMQPRepository)
 	repo.On("GetChannel").Return(ch, nil).Once()
 
-	serv := NewAMQPService(config.AMQP{}, repo, logrus.New())
+	serv := NewAMQPService(AMQPConfig{}, repo, logrus.New())
 
 	err := serv.Send(amqp.Publishing{})
 	assert.NoError(t, err)
