@@ -53,9 +53,9 @@ func NewAMQPService(
 }
 
 func (as qpService) isConnectionError(err error) bool {
-	amqpErr, ok := err.(amqp.Error)
+	amqpErr, ok := err.(*amqp.Error)
 	if !ok {
-		as.log.Trace("error is not a connection error")
+		as.log.WithField("error", err).Trace("error is not an amqp origin error")
 		return false
 	}
 	return amqpErr.Code == amqp.ChannelError
