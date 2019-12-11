@@ -47,3 +47,35 @@ func (_m *AMQPConnection) Close() error {
 
 	return r0
 }
+
+// NotifyBlocked provides a mock function with given fields: receiver
+func (_m *AMQPConnection) NotifyBlocked(receiver chan amqp.Blocking) chan amqp.Blocking {
+	ret := _m.Called(receiver)
+
+	var r0 chan amqp.Blocking
+	if rf, ok := ret.Get(0).(func(chan amqp.Blocking) chan amqp.Blocking); ok {
+		r0 = rf(receiver)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(chan amqp.Blocking)
+		}
+	}
+
+	return r0
+}
+
+// NotifyClose provides a mock function with given fields: receiver
+func (_m *AMQPConnection) NotifyClose(receiver chan *amqp.Error) chan *amqp.Error {
+	ret := _m.Called(receiver)
+
+	var r0 chan *amqp.Error
+	if rf, ok := ret.Get(0).(func(chan *amqp.Error) chan *amqp.Error); ok {
+		r0 = rf(receiver)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(chan *amqp.Error)
+		}
+	}
+
+	return r0
+}

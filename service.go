@@ -20,6 +20,8 @@
 package queue
 
 import (
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
@@ -41,6 +43,9 @@ type qpService struct {
 	repo AMQPRepository
 	conf AMQPConfig
 	log  logrus.Ext1FieldLogger
+
+	closeChan chan *amqp.Error
+	blockChan chan amqp.Blocking
 }
 
 // NewAMQPService creates a new AMQPService
@@ -49,19 +54,64 @@ func NewAMQPService(
 	repo AMQPRepository,
 	log logrus.Ext1FieldLogger) AMQPService {
 
-	return &qpService{repo: repo, conf: conf, log: log}
+	out := &qpService{repo: repo, conf: conf, log: log}
+	out.registerCallbacks()
+	return out
 }
 
-func (as qpService) isConnectionError(err error) bool {
-	amqpErr, ok := err.(*amqp.Error)
-	if !ok {
-		as.log.WithField("error", err).Trace("error is not an amqp origin error")
-		return false
+func (as *qpService) registerCallbacks() {
+	if as.closeChan == nil {
+		as.closeChan = make(chan *amqp.Error)
 	}
-	return amqpErr.Code == amqp.ChannelError
+	if as.blockChan == nil {
+		as.blockChan = make(chan amqp.Blocking)
+	}
+
+	as.repo.AddListeners(as.closeChan, as.blockChan)
+
+	go as.handleClose()
+	go as.handleBlocked()
+
 }
 
-func (as qpService) attemptReconnect() (out error) {
+func (as *qpService) handleClose() {
+	for {
+		amqpErr, ok := <-as.closeChan
+		if !ok {
+			as.log.WithField("queue", as.conf.QueueName).Error("close notify channel closed")
+			return
+		}
+		as.log.WithFields(logrus.Fields{
+			"error": amqpErr,
+		}).Warn("detected a closed connection")
+		as.log.Info("attempting to reconnect")
+
+		err := as.attemptReconnect()
+		if err != nil {
+			as.log.WithFields(logrus.Fields{
+				"error": err,
+				"queue": as.conf.QueueName,
+			}).Error("failed to reconnect")
+			return
+		}
+	}
+}
+
+func (as *qpService) handleBlocked() {
+	for {
+		blocking, ok := <-as.blockChan
+		if !ok {
+			as.log.WithField("queue", as.conf.QueueName).Error("block notify channel closed")
+			return
+		}
+		as.log.WithFields(logrus.Fields{
+			"blocking": blocking.Active,
+			"reason":   blocking.Reason,
+		}).Warn("detected a change in connection blocking")
+	}
+}
+
+func (as *qpService) attemptReconnect() (out error) {
 	for i := 0; i < as.conf.Queue.ReconnRetries; i++ {
 		conn, err := OpenAMQPConnection(as.conf.Endpoint)
 		if err != nil {
@@ -79,30 +129,13 @@ func (as qpService) attemptReconnect() (out error) {
 	return errors.Wrap(out, "could not reconnect to queue")
 }
 
-func (as qpService) Send(pub amqp.Publishing) error {
+func (as *qpService) send(pub amqp.Publishing) error {
 	ch, err := as.repo.GetChannel()
 	if err != nil {
-		if !as.isConnectionError(err) {
-			as.log.WithFields(logrus.Fields{
-				"queue": as.conf.QueueName,
-				"error": err}).Error("had an unrecoverable error")
-			return err
-		}
-		as.log.WithField("queue", as.conf.QueueName).Info("attempting to reconnect")
-		err = as.attemptReconnect()
-		if err != nil {
-			as.log.WithFields(logrus.Fields{
-				"queue": as.conf.QueueName,
-				"error": err}).Error("failed to reconnect")
-			return err
-		}
-		ch, err = as.repo.GetChannel()
-		if err != nil {
-			as.log.WithFields(logrus.Fields{
-				"queue": as.conf.QueueName,
-				"error": err}).Error("failed a second time")
-			return err
-		}
+		as.log.WithFields(logrus.Fields{
+			"queue": as.conf.QueueName,
+			"error": err}).Error("had an unrecoverable error")
+		return err
 	}
 	defer ch.Close()
 	as.log.WithFields(logrus.Fields{
@@ -113,8 +146,23 @@ func (as qpService) Send(pub amqp.Publishing) error {
 		as.conf.Publish.Mandatory, as.conf.Publish.Immediate, pub)
 }
 
-// Consume immediately starts delivering queued messages.
-func (as qpService) Consume() (<-chan amqp.Delivery, error) {
+func (as *qpService) Send(pub amqp.Publishing) (err error) {
+	for i := 0; i <= as.conf.Queue.Retries; i++ {
+		err = as.send(pub)
+		if err == nil {
+			return
+		}
+		as.log.WithFields(logrus.Fields{
+			"queue":   as.conf.QueueName,
+			"attempt": i,
+			"error":   err.Error(),
+		}).Warn("unable to send a message to the queue")
+		time.Sleep(as.conf.Queue.RetryDelay)
+	}
+	return
+}
+
+func (as *qpService) consume() (<-chan amqp.Delivery, error) {
 	ch, err := as.repo.GetChannel()
 	if err != nil {
 		return nil, err
@@ -128,8 +176,24 @@ func (as qpService) Consume() (<-chan amqp.Delivery, error) {
 		as.conf.Consume.Args)
 }
 
-// Requeue rejects the oldMsg and queues the newMsg in a transaction
-func (as qpService) Requeue(oldMsg amqp.Delivery, newMsg amqp.Publishing) error {
+// Consume immediately starts delivering queued messages.
+func (as *qpService) Consume() (del <-chan amqp.Delivery, err error) {
+	for i := 0; i <= as.conf.Queue.Retries; i++ {
+		del, err = as.consume()
+		if err == nil {
+			return
+		}
+		as.log.WithFields(logrus.Fields{
+			"queue":   as.conf.QueueName,
+			"attempt": i,
+			"error":   err.Error(),
+		}).Warn("unable to start consuming")
+		time.Sleep(as.conf.Queue.RetryDelay)
+	}
+	return
+}
+
+func (as *qpService) requeue(oldMsg amqp.Delivery, newMsg amqp.Publishing) error {
 	ch, err := as.repo.GetChannel()
 	if err != nil {
 		return err
@@ -154,8 +218,25 @@ func (as qpService) Requeue(oldMsg amqp.Delivery, newMsg amqp.Publishing) error 
 	return ch.TxCommit()
 }
 
+// Requeue rejects the oldMsg and queues the newMsg in a transaction
+func (as *qpService) Requeue(oldMsg amqp.Delivery, newMsg amqp.Publishing) (err error) {
+	for i := 0; i <= as.conf.Queue.Retries; i++ {
+		err = as.requeue(oldMsg, newMsg)
+		if err == nil {
+			return
+		}
+		as.log.WithFields(logrus.Fields{
+			"queue":   as.conf.QueueName,
+			"attempt": i,
+			"error":   err.Error(),
+		}).Warn("unable to requeue a message")
+		time.Sleep(as.conf.Queue.RetryDelay)
+	}
+	return
+}
+
 // CreateQueue attempts to publish a queue
-func (as qpService) CreateQueue() error {
+func (as *qpService) CreateQueue() error {
 	ch, err := as.repo.GetChannel()
 	if err != nil {
 		return err

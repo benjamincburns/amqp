@@ -20,6 +20,8 @@
 package queue
 
 import (
+	"time"
+
 	"github.com/spf13/viper"
 	"github.com/streadway/amqp"
 )
@@ -76,6 +78,12 @@ type Queue struct {
 	// ReConnRetries is the number of times to attempt to re-connect to a queue
 	// if a connection error is found
 	ReconnRetries int `mapstructure:"queueReconnRetries`
+
+	//Retries is the number of times to retry an action before giving up
+	Retries int `mapstructure:"queueRetries"`
+
+	//RetryDelay is the delay between retries
+	RetryDelay time.Duration `mapstructure:"queueRetryDelay"`
 }
 
 // NewQueue gets Queue from the values in viper
@@ -145,11 +153,16 @@ func NewEndpoint(v *viper.Viper) (out AMQPEndpoint, err error) {
 func SetConfig(v *viper.Viper) {
 	/** START Queue **/
 	v.BindEnv("queueReconnRetries", "QUEUE_RECONN_RETRIES")
+	v.BindEnv("queueRetries", "QUEUE_RETRIES")
+	v.BindEnv("queueRetryDelay", "QUEUE_RETRY_DELAY")
 	v.BindEnv("queueDurable", "QUEUE_DURABLE")
 	v.BindEnv("queueAutoDelete", "QUEUE_AUTO_DELETE")
-	v.SetDefault("queueReconnRetries", 10)
+
 	v.SetDefault("queueDurable", true)
 	v.SetDefault("queueAutoDelete", false)
+	v.SetDefault("queueReconnRetries", 10)
+	v.SetDefault("queueRetries", 10)
+	v.SetDefault("queueRetryDelay", "2s")
 	/** END Queue **/
 
 	/** START Consume **/
