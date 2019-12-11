@@ -20,6 +20,8 @@
 package queue
 
 import (
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
@@ -144,12 +146,23 @@ func (as *qpService) send(pub amqp.Publishing) error {
 		as.conf.Publish.Mandatory, as.conf.Publish.Immediate, pub)
 }
 
-func (as *qpService) Send(pub amqp.Publishing) error {
-	return as.send(pub)
+func (as *qpService) Send(pub amqp.Publishing) (err error) {
+	for i := 0; i <= as.conf.Queue.Retries; i++ {
+		err = as.send(pub)
+		if err == nil {
+			return
+		}
+		as.log.WithFields(logrus.Fields{
+			"queue":   as.conf.QueueName,
+			"attempt": i,
+			"error":   err.Error(),
+		}).Warn("unable to send a message to the queue")
+		time.Sleep(as.conf.Queue.RetryDelay)
+	}
+	return
 }
 
-// Consume immediately starts delivering queued messages.
-func (as *qpService) Consume() (<-chan amqp.Delivery, error) {
+func (as *qpService) consume() (<-chan amqp.Delivery, error) {
 	ch, err := as.repo.GetChannel()
 	if err != nil {
 		return nil, err
@@ -163,8 +176,24 @@ func (as *qpService) Consume() (<-chan amqp.Delivery, error) {
 		as.conf.Consume.Args)
 }
 
-// Requeue rejects the oldMsg and queues the newMsg in a transaction
-func (as *qpService) Requeue(oldMsg amqp.Delivery, newMsg amqp.Publishing) error {
+// Consume immediately starts delivering queued messages.
+func (as *qpService) Consume() (del <-chan amqp.Delivery, err error) {
+	for i := 0; i <= as.conf.Queue.Retries; i++ {
+		del, err = as.consume()
+		if err == nil {
+			return
+		}
+		as.log.WithFields(logrus.Fields{
+			"queue":   as.conf.QueueName,
+			"attempt": i,
+			"error":   err.Error(),
+		}).Warn("unable to start consuming")
+		time.Sleep(as.conf.Queue.RetryDelay)
+	}
+	return
+}
+
+func (as *qpService) requeue(oldMsg amqp.Delivery, newMsg amqp.Publishing) error {
 	ch, err := as.repo.GetChannel()
 	if err != nil {
 		return err
@@ -187,6 +216,23 @@ func (as *qpService) Requeue(oldMsg amqp.Delivery, newMsg amqp.Publishing) error
 		return err
 	}
 	return ch.TxCommit()
+}
+
+// Requeue rejects the oldMsg and queues the newMsg in a transaction
+func (as *qpService) Requeue(oldMsg amqp.Delivery, newMsg amqp.Publishing) (err error) {
+	for i := 0; i <= as.conf.Queue.Retries; i++ {
+		err = as.requeue(oldMsg, newMsg)
+		if err == nil {
+			return
+		}
+		as.log.WithFields(logrus.Fields{
+			"queue":   as.conf.QueueName,
+			"attempt": i,
+			"error":   err.Error(),
+		}).Warn("unable to requeue a message")
+		time.Sleep(as.conf.Queue.RetryDelay)
+	}
+	return
 }
 
 // CreateQueue attempts to publish a queue
