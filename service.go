@@ -20,6 +20,7 @@
 package queue
 
 import (
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -46,6 +47,7 @@ type qpService struct {
 
 	closeChan chan *amqp.Error
 	blockChan chan amqp.Blocking
+	mux       *sync.Mutex
 }
 
 // NewAMQPService creates a new AMQPService
@@ -54,7 +56,7 @@ func NewAMQPService(
 	repo AMQPRepository,
 	log logrus.Ext1FieldLogger) AMQPService {
 
-	out := &qpService{repo: repo, conf: conf, log: log}
+	out := &qpService{repo: repo, conf: conf, log: log, mux: &sync.Mutex{}}
 	out.registerCallbacks()
 	return out
 }
@@ -78,8 +80,11 @@ func (as *qpService) handleClose() {
 	for {
 		amqpErr, ok := <-as.closeChan
 		if !ok {
+			as.mux.Lock()
+			as.closeChan = make(chan *amqp.Error)
+			as.mux.Unlock()
+
 			as.log.WithField("queue", as.conf.QueueName).Error("close notify channel closed")
-			return
 		}
 		as.log.WithFields(logrus.Fields{
 			"error": amqpErr,
@@ -101,8 +106,11 @@ func (as *qpService) handleBlocked() {
 	for {
 		blocking, ok := <-as.blockChan
 		if !ok {
+			as.mux.Lock()
+			as.blockChan = make(chan amqp.Blocking)
+			as.mux.Unlock()
+
 			as.log.WithField("queue", as.conf.QueueName).Error("block notify channel closed")
-			return
 		}
 		as.log.WithFields(logrus.Fields{
 			"blocking": blocking.Active,
@@ -124,6 +132,7 @@ func (as *qpService) attemptReconnect() (out error) {
 			continue
 		}
 		as.repo.SwapConn(conn)
+		as.repo.AddListeners(as.closeChan, as.blockChan)
 		return nil
 	}
 	return errors.Wrap(out, "could not reconnect to queue")
@@ -153,7 +162,9 @@ func (as *qpService) Send(pub amqp.Publishing) (err error) {
 			return
 		}
 		if i == 0 {
+			as.mux.Lock()
 			as.closeChan <- nil
+			as.mux.Unlock()
 		}
 		as.log.WithFields(logrus.Fields{
 			"queue":   as.conf.QueueName,
@@ -187,7 +198,9 @@ func (as *qpService) Consume() (del <-chan amqp.Delivery, err error) {
 			return
 		}
 		if i == 0 {
+			as.mux.Lock()
 			as.closeChan <- nil
+			as.mux.Unlock()
 		}
 		as.log.WithFields(logrus.Fields{
 			"queue":   as.conf.QueueName,
@@ -232,7 +245,9 @@ func (as *qpService) Requeue(oldMsg amqp.Delivery, newMsg amqp.Publishing) (err 
 			return
 		}
 		if i == 0 {
+			as.mux.Lock()
 			as.closeChan <- nil
+			as.mux.Unlock()
 		}
 		as.log.WithFields(logrus.Fields{
 			"queue":   as.conf.QueueName,

@@ -36,10 +36,8 @@ type AMQPRepository interface {
 }
 
 type amqpRepository struct {
-	conn       externals.AMQPConnection
-	mux        *sync.Mutex
-	closeChans []chan *amqp.Error
-	blockChans []chan amqp.Blocking
+	conn externals.AMQPConnection
+	mux  *sync.Mutex
 }
 
 //NewAMQPRepository creates a new AMQPRepository
@@ -64,13 +62,6 @@ func (ar *amqpRepository) SwapConn(conn externals.AMQPConnection) {
 	ar.conn.Close()
 
 	ar.conn = conn
-	for i := range ar.closeChans {
-		ar.conn.NotifyClose(ar.closeChans[i])
-	}
-
-	for i := range ar.blockChans {
-		ar.conn.NotifyBlocked(ar.blockChans[i])
-	}
 }
 
 func (ar *amqpRepository) GetConn() externals.AMQPConnection {
@@ -79,11 +70,8 @@ func (ar *amqpRepository) GetConn() externals.AMQPConnection {
 
 func (ar *amqpRepository) AddListeners(closeChan chan *amqp.Error,
 	blockChan chan amqp.Blocking) {
-
 	ar.mux.Lock()
 	defer ar.mux.Unlock()
-	ar.closeChans = append(ar.closeChans, closeChan)
-	ar.blockChans = append(ar.blockChans, blockChan)
 
 	ar.conn.NotifyClose(closeChan)
 	ar.conn.NotifyBlocked(blockChan)
