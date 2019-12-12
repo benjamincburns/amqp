@@ -163,7 +163,7 @@ func (as *qpService) Send(pub amqp.Publishing) (err error) {
 		}
 		if i == 0 {
 			as.mux.Lock()
-			as.closeChan <- nil
+			as.closeChan <- new(amqp.Error)
 			as.mux.Unlock()
 		}
 		as.log.WithFields(logrus.Fields{
