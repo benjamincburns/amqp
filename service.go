@@ -152,6 +152,9 @@ func (as *qpService) Send(pub amqp.Publishing) (err error) {
 		if err == nil {
 			return
 		}
+		if i == 0 {
+			as.closeChan <- nil
+		}
 		as.log.WithFields(logrus.Fields{
 			"queue":   as.conf.QueueName,
 			"attempt": i,
@@ -182,6 +185,9 @@ func (as *qpService) Consume() (del <-chan amqp.Delivery, err error) {
 		del, err = as.consume()
 		if err == nil {
 			return
+		}
+		if i == 0 {
+			as.closeChan <- nil
 		}
 		as.log.WithFields(logrus.Fields{
 			"queue":   as.conf.QueueName,
@@ -224,6 +230,9 @@ func (as *qpService) Requeue(oldMsg amqp.Delivery, newMsg amqp.Publishing) (err 
 		err = as.requeue(oldMsg, newMsg)
 		if err == nil {
 			return
+		}
+		if i == 0 {
+			as.closeChan <- nil
 		}
 		as.log.WithFields(logrus.Fields{
 			"queue":   as.conf.QueueName,
