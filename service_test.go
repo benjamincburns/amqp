@@ -20,7 +20,6 @@
 package queue
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/whiteblock/amqp/mocks"
@@ -122,78 +121,6 @@ func TestAMQPService_Requeue_Success(t *testing.T) {
 	ch.AssertExpectations(t)
 }
 
-func TestAMQPService_Requeue_RejectDelivery_Failure(t *testing.T) {
-	ch := new(mocks.AMQPChannel)
-	ch.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-	ch.On("Tx").Return(nil).Once()
-	ch.On("Close").Return(nil).Once()
-	ch.On("TxRollback").Return(nil).Once()
-
-	repo := new(mocks.AMQPRepository)
-	repo.On("GetChannel").Return(ch, nil).Once()
-	repo.On("RejectDelivery", mock.Anything, mock.Anything).Return(fmt.Errorf("error")).Once()
-	repo.On("AddListeners", mock.Anything, mock.Anything).Once()
-
-	serv := NewAMQPService(AMQPConfig{}, repo, logrus.New())
-
-	err := serv.Requeue(amqp.Delivery{}, amqp.Publishing{})
-	assert.Error(t, err)
-
-	repo.AssertExpectations(t)
-	ch.AssertExpectations(t)
-}
-
-func TestAMQPService_Requeue_GetChannel_Failure(t *testing.T) {
-	repo := new(mocks.AMQPRepository)
-	repo.On("GetChannel").Return(nil, fmt.Errorf("error")).Once()
-	repo.On("AddListeners", mock.Anything, mock.Anything).Once()
-	serv := NewAMQPService(AMQPConfig{}, repo, logrus.New())
-
-	err := serv.Requeue(amqp.Delivery{}, amqp.Publishing{})
-	assert.Error(t, err)
-
-	repo.AssertExpectations(t)
-}
-
-func TestAMQPService_Requeue_Tx_Failure(t *testing.T) {
-	ch := new(mocks.AMQPChannel)
-	ch.On("Tx").Return(fmt.Errorf("error")).Once()
-	ch.On("Close").Return(nil).Once()
-
-	repo := new(mocks.AMQPRepository)
-	repo.On("GetChannel").Return(ch, nil).Once()
-	repo.On("AddListeners", mock.Anything, mock.Anything).Once()
-
-	serv := NewAMQPService(AMQPConfig{}, repo, logrus.New())
-
-	err := serv.Requeue(amqp.Delivery{}, amqp.Publishing{})
-	assert.Error(t, err)
-
-	repo.AssertExpectations(t)
-	ch.AssertExpectations(t)
-}
-
-func TestAMQPService_Requeue_Publish_Failure(t *testing.T) {
-	ch := new(mocks.AMQPChannel)
-	ch.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
-		fmt.Errorf("error")).Once()
-	ch.On("Tx").Return(nil).Once()
-	ch.On("Close").Return(nil).Once()
-	ch.On("TxRollback").Return(nil).Once()
-
-	repo := new(mocks.AMQPRepository)
-	repo.On("GetChannel").Return(ch, nil).Once()
-	repo.On("AddListeners", mock.Anything, mock.Anything).Once()
-
-	serv := NewAMQPService(AMQPConfig{}, repo, logrus.New())
-
-	err := serv.Requeue(amqp.Delivery{}, amqp.Publishing{})
-	assert.Error(t, err)
-
-	repo.AssertExpectations(t)
-	ch.AssertExpectations(t)
-}
-
 func TestAmqpService_CreateQueue(t *testing.T) {
 	conf := AMQPConfig{
 		QueueName: "test queue",
@@ -207,10 +134,12 @@ func TestAmqpService_CreateQueue(t *testing.T) {
 	}
 
 	ch := new(mocks.AMQPChannel)
-	ch.On("QueueDeclare", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(amqp.Queue{}, nil).Run(
+	ch.On("QueueDeclare", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+		mock.Anything, mock.Anything).Return(amqp.Queue{}, nil).Run(
 		func(args mock.Arguments) {
 			require.Len(t, args, 6)
-			assert.True(t, args[0:5].Is(conf.QueueName, conf.Queue.Durable, conf.Queue.AutoDelete, conf.Queue.Exclusive, conf.Queue.NoWait, conf.Queue.Args))
+			assert.True(t, args[0:5].Is(conf.QueueName, conf.Queue.Durable, conf.Queue.AutoDelete,
+				conf.Queue.Exclusive, conf.Queue.NoWait, conf.Queue.Args))
 		}).Once()
 	ch.On("Close").Return(nil).Once()
 	repo := new(mocks.AMQPRepository)
@@ -223,18 +152,6 @@ func TestAmqpService_CreateQueue(t *testing.T) {
 
 	repo.AssertExpectations(t)
 	ch.AssertExpectations(t)
-}
-
-func TestAMQPService_Send_GetChannel_Failure(t *testing.T) {
-	repo := new(mocks.AMQPRepository)
-	repo.On("GetChannel").Return(nil, fmt.Errorf("error")).Once()
-	repo.On("AddListeners", mock.Anything, mock.Anything).Once()
-	serv := NewAMQPService(AMQPConfig{}, repo, logrus.New())
-
-	err := serv.Send(amqp.Publishing{})
-	assert.Error(t, err)
-
-	repo.AssertExpectations(t)
 }
 
 func TestAMQPService_Send_Success(t *testing.T) {
