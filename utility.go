@@ -27,16 +27,8 @@ import (
 	"github.com/streadway/amqp"
 )
 
-// OpenAMQPConnection attempts to dial a new AMQP connection
-func OpenAMQPConnection(conf AMQPEndpoint) (*amqp.Connection, error) {
-	return amqp.Dial(fmt.Sprintf("%s://%s:%s@%s:%d/%s",
-		conf.QueueProtocol,
-		conf.QueueUser,
-		conf.QueuePassword,
-		conf.QueueHost,
-		conf.QueuePort,
-		conf.QueueVHost))
-}
+// RetryCountHeader is the header for the retry count of the amqp message
+const RetryCountHeader = "retryCount"
 
 // AMQPMessage contains utilities for manipulating AMQP messages
 type AMQPMessage interface {
@@ -56,7 +48,37 @@ func NewAMQPMessage(maxRetries int64) AMQPMessage {
 	return &amqpMessage{maxRetries: maxRetries}
 }
 
+// CreateMessage creates a message from the given body
 func (am amqpMessage) CreateMessage(body interface{}) (amqp.Publishing, error) {
+	return CreateMessage(body)
+}
+
+// GetNextMessage is similar to GetKickbackMessage but takes in a new body, and does not increment the
+// retry count
+func (am amqpMessage) GetNextMessage(msg amqp.Delivery, body interface{}) (amqp.Publishing, error) {
+	return GetNextMessage(msg, body)
+}
+
+// GetKickbackMessage takes the delivery and creates a message from it
+// for requeuing on non-fatal error. It returns an error if the number of retries is
+// exceeded
+func (am amqpMessage) GetKickbackMessage(msg amqp.Delivery) (amqp.Publishing, error) {
+	return GetKickbackMessage(am.maxRetries, msg)
+}
+
+// OpenAMQPConnection attempts to dial a new AMQP connection
+func OpenAMQPConnection(conf AMQPEndpoint) (*amqp.Connection, error) {
+	return amqp.Dial(fmt.Sprintf("%s://%s:%s@%s:%d/%s",
+		conf.QueueProtocol,
+		conf.QueueUser,
+		conf.QueuePassword,
+		conf.QueueHost,
+		conf.QueuePort,
+		conf.QueueVHost))
+}
+
+// CreateMessage creates a message from the given body
+func CreateMessage(body interface{}) (amqp.Publishing, error) {
 	rawBody, err := json.Marshal(body)
 	if err != nil {
 		return amqp.Publishing{}, err
@@ -64,7 +86,7 @@ func (am amqpMessage) CreateMessage(body interface{}) (amqp.Publishing, error) {
 
 	pub := amqp.Publishing{
 		Headers: map[string]interface{}{
-			"retryCount": int64(0),
+			RetryCountHeader: int64(0),
 		},
 		Body: rawBody,
 	}
@@ -73,7 +95,7 @@ func (am amqpMessage) CreateMessage(body interface{}) (amqp.Publishing, error) {
 
 // GetNextMessage is similar to GetKickbackMessage but takes in a new body, and does not increment the
 // retry count
-func (am amqpMessage) GetNextMessage(msg amqp.Delivery, body interface{}) (amqp.Publishing, error) {
+func GetNextMessage(msg amqp.Delivery, body interface{}) (amqp.Publishing, error) {
 	rawBody, err := json.Marshal(body)
 	if err != nil {
 		return amqp.Publishing{}, err
@@ -90,14 +112,15 @@ func (am amqpMessage) GetNextMessage(msg amqp.Delivery, body interface{}) (amqp.
 	if pub.Headers == nil {
 		pub.Headers = map[string]interface{}{}
 	}
-	pub.Headers["retryCount"] = int64(0) //reset retry count
+	pub.Headers[RetryCountHeader] = int64(0) //reset retry count
 
 	return pub, nil
 }
 
 // GetKickbackMessage takes the delivery and creates a message from it
-// for requeuing on non-fatal error. It returns an error if
-func (am amqpMessage) GetKickbackMessage(msg amqp.Delivery) (amqp.Publishing, error) {
+// for requeuing on non-fatal error. It returns an error if the number of retries is
+// exceeded
+func GetKickbackMessage(maxRetries int64, msg amqp.Delivery) (amqp.Publishing, error) {
 	pub := amqp.Publishing{
 		Headers: msg.Headers,
 		// Properties
@@ -116,13 +139,13 @@ func (am amqpMessage) GetKickbackMessage(msg amqp.Delivery) (amqp.Publishing, er
 	if pub.Headers == nil {
 		pub.Headers = map[string]interface{}{}
 	}
-	_, exists := pub.Headers["retryCount"]
+	_, exists := pub.Headers[RetryCountHeader]
 	if !exists {
-		pub.Headers["retryCount"] = int64(0)
+		pub.Headers[RetryCountHeader] = int64(0)
 	}
-	if pub.Headers["retryCount"].(int64) > am.maxRetries {
+	if pub.Headers[RetryCountHeader].(int64) > maxRetries {
 		return amqp.Publishing{}, errors.New("too many retries")
 	}
-	pub.Headers["retryCount"] = pub.Headers["retryCount"].(int64) + 1
+	pub.Headers[RetryCountHeader] = pub.Headers[RetryCountHeader].(int64) + 1
 	return pub, nil
 }
