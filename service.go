@@ -98,10 +98,12 @@ func (as *qpService) handleClose() {
 			}
 		case amqpErr = <-as.failedChan:
 		}
+		if amqpErr != nil {
+			as.log.WithFields(logrus.Fields{
+				"error": amqpErr,
+			}).Warn("detected a closed connection")
+		}
 
-		as.log.WithFields(logrus.Fields{
-			"error": amqpErr,
-		}).Warn("detected a closed connection")
 		as.log.Info("attempting to reconnect")
 
 		i := 0
