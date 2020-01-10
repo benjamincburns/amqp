@@ -51,6 +51,20 @@ type qpService struct {
 	mux        *sync.Mutex
 }
 
+// NewService is a more convienent form of NewAMQPService. It calls log.Panic on error
+func NewService(conf AMQPConfig, log logrus.Ext1FieldLogger) AMQPService {
+	conn, err := OpenAMQPConnection(conf.Endpoint)
+	if err != nil {
+		log.Panic(err)
+	}
+	log.WithFields(logrus.Fields{
+		"amqpHost": conf.Endpoint.QueueHost,
+		"amqpUser": conf.Endpoint.QueueUser,
+		"amqpPort": conf.Endpoint.QueuePort,
+	}).Info("opened an amqp connection")
+	return NewAMQPService(conf, NewAMQPRepository(conn), log)
+}
+
 // NewAMQPService creates a new AMQPService
 func NewAMQPService(
 	conf AMQPConfig,
