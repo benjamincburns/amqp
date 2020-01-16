@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
 )
 
@@ -56,6 +57,23 @@ func OpenAMQPConnection(conf AMQPEndpoint) (*amqp.Connection, error) {
 		conf.QueueHost,
 		conf.QueuePort,
 		conf.QueueVHost))
+}
+
+// TryCreateQueues atempts to create the given queues, but doesn't error out if it fails
+func TryCreateQueues(log logrus.Ext1FieldLogger, queues ...AMQPService) {
+	errChan := make(chan error)
+	for i := range queues {
+		go func(i int) {
+			errChan <- queues[i].CreateQueue()
+		}(i)
+	}
+
+	for range queues {
+		err := <-errChan
+		if err != nil {
+			log.WithFields(logrus.Fields{"err": err}).Debug("failed to create a queue")
+		}
+	}
 }
 
 // CreateMessage creates a message from the given body

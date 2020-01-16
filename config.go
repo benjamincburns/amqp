@@ -18,6 +18,7 @@ type AMQPConfig struct {
 	// Publish is the configuration for the publishing of messages
 	Publish Publish
 
+	// Endpoint is the configuration for the connection endpoint
 	Endpoint AMQPEndpoint
 }
 
