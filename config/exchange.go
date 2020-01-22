@@ -36,6 +36,7 @@ func NewExchange(v *viper.Viper) (out Exchange, err error) {
 	return out, v.Unmarshal(&out)
 }
 
+// SetupExchange configures viper for Exchange
 func SetupExchange(v *viper.Viper) {
 	v.BindEnv("exchangeName", "EXCHANGE_NAME")
 	v.BindEnv("exchangeKind", "EXCHANGE_KIND")

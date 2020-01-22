@@ -50,6 +50,7 @@ func (am amqpMessage) GetKickbackMessage(msg amqp.Delivery) (amqp.Publishing, er
 	return GetKickbackMessage(am.maxRetries, msg)
 }
 
+// AssertUniqueQueues ensures that the configurations consists of unique queues
 func AssertUniqueQueues(log logrus.Ext1FieldLogger, confs ...config.Config) {
 	queues := map[string]bool{}
 	for i := range confs {

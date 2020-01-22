@@ -16,6 +16,7 @@ func NewPublish(v *viper.Viper) (out Publish, err error) {
 	return out, v.Unmarshal(&out)
 }
 
+// SetupPublish configures viper for Publish
 func SetupPublish(v *viper.Viper) {
 	v.BindEnv("publishMandatory", "PUBLISH_MANDATORY")
 	v.BindEnv("publishImmediate", "PUBLISH_IMMEDIATE")

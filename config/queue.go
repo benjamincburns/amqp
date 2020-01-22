@@ -40,6 +40,7 @@ func NewQueue(v *viper.Viper) (Queue, error) {
 	return out, v.Unmarshal(&out)
 }
 
+// SetupQueue configures viper for Queue
 func SetupQueue(v *viper.Viper) {
 	v.BindEnv("queueReconnRetries", "QUEUE_RECONN_RETRIES")
 	v.BindEnv("queueRetries", "QUEUE_RETRIES")

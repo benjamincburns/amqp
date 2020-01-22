@@ -19,6 +19,7 @@ func NewEndpoint(v *viper.Viper) (out Endpoint, err error) {
 	return out, v.Unmarshal(&out)
 }
 
+// SetupEndpoint configures viper for Endpoint
 func SetupEndpoint(v *viper.Viper) {
 	v.BindEnv("queueProtocol", "QUEUE_PROTOCOL")
 	v.BindEnv("queueUser", "QUEUE_USER")

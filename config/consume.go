@@ -32,6 +32,7 @@ func NewConsume(v *viper.Viper) (Consume, error) {
 	return out, v.Unmarshal(&out)
 }
 
+// SetupConsume configures viper for Consume
 func SetupConsume(v *viper.Viper) {
 	v.BindEnv("consumer", "CONSUMER")
 	v.BindEnv("consumerNoWait", "CONSUMER_NO_WAIT")
