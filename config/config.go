@@ -1,10 +1,7 @@
 package config
 
 import (
-	"time"
-
 	"github.com/spf13/viper"
-	"github.com/streadway/amqp"
 )
 
 // Config is the configuration for AMQP

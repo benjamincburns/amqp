@@ -1,10 +1,7 @@
 package config
 
 import (
-	"time"
-
 	"github.com/spf13/viper"
-	"github.com/streadway/amqp"
 )
 
 // Endpoint is the configuration needed to connect to a rabbitmq vhost
@@ -17,8 +14,8 @@ type Endpoint struct {
 	QueueVHost    string `mapstructure:"queueVHost"`
 }
 
-// NewEndpoint gets AMQPEndpoint from the values in viper
-func NewEndpoint(v *viper.Viper) (out AMQPEndpoint, err error) {
+// NewEndpoint gets Endpoint from the values in viper
+func NewEndpoint(v *viper.Viper) (out Endpoint, err error) {
 	return out, v.Unmarshal(&out)
 }
 

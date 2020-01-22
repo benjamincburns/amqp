@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/whiteblock/amqp/config"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
@@ -49,7 +51,7 @@ func (am amqpMessage) GetKickbackMessage(msg amqp.Delivery) (amqp.Publishing, er
 }
 
 // OpenAMQPConnection attempts to dial a new AMQP connection
-func OpenAMQPConnection(conf AMQPEndpoint) (*amqp.Connection, error) {
+func OpenAMQPConnection(conf config.Endpoint) (*amqp.Connection, error) {
 	return amqp.Dial(fmt.Sprintf("%s://%s:%s@%s:%d/%s",
 		conf.QueueProtocol,
 		conf.QueueUser,

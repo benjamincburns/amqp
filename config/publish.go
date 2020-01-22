@@ -2,7 +2,6 @@ package config
 
 import (
 	"github.com/spf13/viper"
-	"github.com/streadway/amqp"
 )
 
 // Publish is the configuration for the publishing of messages
