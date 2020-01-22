@@ -3,8 +3,8 @@ package queue
 import (
 	"testing"
 
-	"github.com/whiteblock/amqp/mocks"
 	"github.com/whiteblock/amqp/config"
+	"github.com/whiteblock/amqp/mocks"
 
 	"github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"

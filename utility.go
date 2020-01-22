@@ -50,6 +50,19 @@ func (am amqpMessage) GetKickbackMessage(msg amqp.Delivery) (amqp.Publishing, er
 	return GetKickbackMessage(am.maxRetries, msg)
 }
 
+func AssertUniqueQueues(log logrus.Ext1FieldLogger, confs ...config.Config) {
+	queues := map[string]bool{}
+	for i := range confs {
+		queues[confs[i].QueueName] = false
+		if len(queues)-1 != i {
+			for j := range confs {
+				log.Errorf("%d = %s", j, confs[j].QueueName)
+			}
+			log.Panic("queue names are not unique")
+		}
+	}
+}
+
 // OpenAMQPConnection attempts to dial a new AMQP connection
 func OpenAMQPConnection(conf config.Endpoint) (*amqp.Connection, error) {
 	return amqp.Dial(fmt.Sprintf("%s://%s:%s@%s:%d/%s",
