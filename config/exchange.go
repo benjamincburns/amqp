@@ -22,6 +22,15 @@ type Exchange struct {
 	Args amqp.Table
 }
 
+// AsXDelay set the exchange up as an x-delay-type
+func (ex Exchange) AsXDelay() Exchange {
+	ex.Args = amqp.Table{
+		"x-delayed-type": "direct",
+	}
+	ex.Kind = "x-delayed-message"
+	return ex
+}
+
 // NewExchange gets Exchange from the values in viper
 func NewExchange(v *viper.Viper) (out Exchange, err error) {
 	return out, v.Unmarshal(&out)

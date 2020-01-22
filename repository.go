@@ -8,7 +8,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
-//AMQPRepository represents functions for connecting to a AMQP provider
+// AMQPRepository represents functions for connecting to a AMQP provider
 type AMQPRepository interface {
 	GetChannel() (externals.AMQPChannel, error)
 	RejectDelivery(msg externals.AMQPDelivery, requeue bool) error
@@ -21,7 +21,7 @@ type amqpRepository struct {
 	mux  *sync.Mutex
 }
 
-//NewAMQPRepository creates a new AMQPRepository
+// NewAMQPRepository creates a new AMQPRepository
 func NewAMQPRepository(conn externals.AMQPConnection) AMQPRepository {
 	return &amqpRepository{conn: conn, mux: &sync.Mutex{}}
 }
