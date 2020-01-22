@@ -4,12 +4,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/whiteblock/amqp/config"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
 )
 
-//AMQPService acts as a simple interface to the command queue
+// AMQPService acts as a simple interface to the command queue
 type AMQPService interface {
 	//Consume immediately starts delivering queued messages.
 	Consume() (<-chan amqp.Delivery, error)
@@ -19,11 +21,14 @@ type AMQPService interface {
 	Requeue(oldMsg amqp.Delivery, newMsg amqp.Publishing) error
 	//CreateQueue attempts to publish a queue
 	CreateQueue() error
+
+	// CreateExchange will attempt to create an exchange
+	CreateExchange() error
 }
 
 type qpService struct {
 	repo AMQPRepository
-	conf AMQPConfig
+	conf config.Config
 	log  logrus.Ext1FieldLogger
 
 	closeChan  chan *amqp.Error
@@ -33,7 +38,7 @@ type qpService struct {
 }
 
 // NewService is a more convienent form of NewAMQPService. It calls log.Panic on error
-func NewService(conf AMQPConfig, log logrus.Ext1FieldLogger) AMQPService {
+func NewService(conf config.Config, log logrus.Ext1FieldLogger) AMQPService {
 	conn, err := OpenAMQPConnection(conf.Endpoint)
 	if err != nil {
 		log.Panic(err)
@@ -48,7 +53,7 @@ func NewService(conf AMQPConfig, log logrus.Ext1FieldLogger) AMQPService {
 
 // NewAMQPService creates a new AMQPService
 func NewAMQPService(
-	conf AMQPConfig,
+	conf config.Config,
 	repo AMQPRepository,
 	log logrus.Ext1FieldLogger) AMQPService {
 
@@ -287,4 +292,18 @@ func (as *qpService) CreateQueue() error {
 	_, err = ch.QueueDeclare(as.conf.QueueName, as.conf.Queue.Durable, as.conf.Queue.AutoDelete,
 		as.conf.Queue.Exclusive, as.conf.Queue.NoWait, as.conf.Queue.Args)
 	return err
+}
+
+// CreateExchange will attempt to create an exchange
+func (as qpService) CreateExchange() error {
+	if as.conf.Exchange.Name == "" {
+		return nil
+	}
+	ch, err := as.repo.GetChannel()
+	if err != nil {
+		return err
+	}
+	defer ch.Close()
+	return ch.ExchangeDeclare(as.conf.Exchange.Name, as.conf.Exchange.Kind, as.conf.Exchange.Durable,
+		as.conf.Exchange.AutoDelete, as.conf.Exchange.Internal, as.conf.Exchange.NoWait, as.conf.Exchange.Args)
 }

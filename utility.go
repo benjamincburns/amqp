@@ -66,12 +66,16 @@ func TryCreateQueues(log logrus.Ext1FieldLogger, queues ...AMQPService) {
 		go func(i int) {
 			errChan <- queues[i].CreateQueue()
 		}(i)
+
+		go func(i int) {
+			errChan <- queues[i].CreateExchange()
+		}(i)
 	}
 
-	for range queues {
+	for i := 0; i < len(queues)*2; i++ {
 		err := <-errChan
 		if err != nil {
-			log.WithFields(logrus.Fields{"err": err}).Debug("failed to create a queue")
+			log.WithFields(logrus.Fields{"err": err}).Debug("failed to create a queue or exchange")
 		}
 	}
 }
