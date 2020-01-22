@@ -3,6 +3,7 @@ package queue
 import (
 	"testing"
 
+	"github.com/whiteblock/amqp/config"
 	"github.com/whiteblock/amqp/mocks"
 
 	"github.com/sirupsen/logrus"
@@ -13,7 +14,7 @@ import (
 )
 
 func TestNewAMQPService(t *testing.T) {
-	conf := AMQPConfig{
+	conf := config.Config{
 		QueueName: "test queue",
 	}
 	repo := new(mocks.AMQPRepository)
@@ -23,9 +24,9 @@ func TestNewAMQPService(t *testing.T) {
 }
 
 func TestAMQPService_Consume(t *testing.T) {
-	conf := AMQPConfig{
+	conf := config.Config{
 		QueueName: "test queue",
-		Consume: Consume{
+		Consume: config.Consume{
 			Consumer:  "test",
 			AutoAck:   false,
 			Exclusive: false,
@@ -56,9 +57,9 @@ func TestAMQPService_Consume(t *testing.T) {
 }
 
 func TestAMQPService_Requeue_Success(t *testing.T) {
-	conf := AMQPConfig{
+	conf := config.Config{
 		QueueName: "test queue",
-		Publish: Publish{
+		Publish: config.Publish{
 			Mandatory: true,
 			Immediate: true,
 		},
@@ -103,9 +104,9 @@ func TestAMQPService_Requeue_Success(t *testing.T) {
 }
 
 func TestAmqpService_CreateQueue(t *testing.T) {
-	conf := AMQPConfig{
+	conf := config.Config{
 		QueueName: "test queue",
-		Queue: Queue{
+		Queue: config.Queue{
 			Durable:    true,
 			AutoDelete: false,
 			Exclusive:  false,
@@ -143,7 +144,7 @@ func TestAMQPService_Send_Success(t *testing.T) {
 	repo := new(mocks.AMQPRepository)
 	repo.On("GetChannel").Return(ch, nil).Once()
 	repo.On("AddListeners", mock.Anything, mock.Anything).Once()
-	serv := NewAMQPService(AMQPConfig{}, repo, logrus.New())
+	serv := NewAMQPService(config.Config{}, repo, logrus.New())
 
 	err := serv.Send(amqp.Publishing{})
 	assert.NoError(t, err)

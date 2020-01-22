@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/whiteblock/amqp/config"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
@@ -48,8 +50,22 @@ func (am amqpMessage) GetKickbackMessage(msg amqp.Delivery) (amqp.Publishing, er
 	return GetKickbackMessage(am.maxRetries, msg)
 }
 
+// AssertUniqueQueues ensures that the configurations consists of unique queues
+func AssertUniqueQueues(log logrus.Ext1FieldLogger, confs ...config.Config) {
+	queues := map[string]bool{}
+	for i := range confs {
+		queues[confs[i].QueueName] = false
+		if len(queues)-1 != i {
+			for j := range confs {
+				log.Errorf("%d = %s", j, confs[j].QueueName)
+			}
+			log.Panic("queue names are not unique")
+		}
+	}
+}
+
 // OpenAMQPConnection attempts to dial a new AMQP connection
-func OpenAMQPConnection(conf AMQPEndpoint) (*amqp.Connection, error) {
+func OpenAMQPConnection(conf config.Endpoint) (*amqp.Connection, error) {
 	return amqp.Dial(fmt.Sprintf("%s://%s:%s@%s:%d/%s",
 		conf.QueueProtocol,
 		conf.QueueUser,
@@ -66,12 +82,16 @@ func TryCreateQueues(log logrus.Ext1FieldLogger, queues ...AMQPService) {
 		go func(i int) {
 			errChan <- queues[i].CreateQueue()
 		}(i)
+
+		go func(i int) {
+			errChan <- queues[i].CreateExchange()
+		}(i)
 	}
 
-	for range queues {
+	for i := 0; i < len(queues)*2; i++ {
 		err := <-errChan
 		if err != nil {
-			log.WithFields(logrus.Fields{"err": err}).Debug("failed to create a queue")
+			log.WithFields(logrus.Fields{"err": err}).Debug("failed to create a queue or exchange")
 		}
 	}
 }
