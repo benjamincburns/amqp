@@ -84,8 +84,25 @@ func TryCreateQueues(log logrus.Ext1FieldLogger, queues ...AMQPService) {
 		}(i)
 
 		go func(i int) {
-			errChan <- queues[i].CreateExchange()
+			err := queues[i].CreateExchange()
+			if err != nil {
+				errChan <- err
+				return
+			}
+			ch, err := queues[i].Channel()
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			err = ch.ExchangeBind("", "", queues[i].Exchange(), false, nil)
+			if err != nil {
+				errChan <- err
+				return
+			}
+
 		}(i)
+
 	}
 
 	for i := 0; i < len(queues)*2; i++ {
