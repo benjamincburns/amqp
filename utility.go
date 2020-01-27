@@ -74,6 +74,11 @@ func OpenAMQPConnection(conf config.Endpoint) (*amqp.Connection, error) {
 		conf.QueuePort,
 		conf.QueueVHost))
 }
+// AutoSetup calls TryCreateQueues and then BindQueuesToExchange
+func AutoSetup(log logrus.Ext1FieldLogger, queues ...AMQPService) {
+	TryCreateQueues(log, queues...)
+	BindQueuesToExchange(log, queues...)
+}
 
 // TryCreateQueues atempts to create the given queues, but doesn't error out if it fails
 func TryCreateQueues(log logrus.Ext1FieldLogger, queues ...AMQPService) {
@@ -89,6 +94,35 @@ func TryCreateQueues(log logrus.Ext1FieldLogger, queues ...AMQPService) {
 	}
 
 	for i := 0; i < len(queues)*2; i++ {
+		err := <-errChan
+		if err != nil {
+			log.WithFields(logrus.Fields{"err": err}).Debug("failed to create a queue or exchange")
+		}
+	}
+}
+
+// BindQueuesToExchange binds to queues to the exchange, if it is not the default exchange, with the queue
+// name as the routing key
+func BindQueuesToExchange(log logrus.Ext1FieldLogger, queues ...AMQPService) {
+	errChan := make(chan error)
+	for i := range queues {
+		go func(i int) {
+			ch, err :=  queues[i].Channel()
+			if err != nil {
+				errChan <- err
+				return
+			}
+			defer ch.Close()
+			conf := queues[i].Config()
+			if conf.Exchange.Name == "" { //skip default exchange
+				errChan <- nil
+				return
+			}
+			errChan <- ch.QueueBind(conf.QueueName, conf.QueueName, conf.Exchange.Name, false ,nil)
+		}(i)
+		
+	}
+	for i := 0; i < len(queues); i++ {
 		err := <-errChan
 		if err != nil {
 			log.WithFields(logrus.Fields{"err": err}).Debug("failed to create a queue or exchange")

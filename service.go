@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/whiteblock/amqp/config"
+	"github.com/whiteblock/amqp/externals"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -24,6 +25,11 @@ type AMQPService interface {
 
 	// CreateExchange will attempt to create an exchange
 	CreateExchange() error
+
+	// Channel gets a channel
+	Channel() (externals.AMQPChannel, error)
+
+	Config() config.Config
 }
 
 type qpService struct {
@@ -306,4 +312,14 @@ func (as qpService) CreateExchange() error {
 	defer ch.Close()
 	return ch.ExchangeDeclare(as.conf.Exchange.Name, as.conf.Exchange.Kind, as.conf.Exchange.Durable,
 		as.conf.Exchange.AutoDelete, as.conf.Exchange.Internal, as.conf.Exchange.NoWait, as.conf.Exchange.Args)
+}
+
+
+// GetChannel gets a channel
+func (as qpService) Channel() (externals.AMQPChannel, error) {
+	return as.repo.GetChannel()
+}
+
+func (as qpService) Config() config.Config {
+	return as.conf
 }

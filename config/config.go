@@ -20,6 +20,20 @@ type Config struct {
 	Exchange Exchange
 }
 
+func (c Config) SetExchangeName(name string) Config {
+	c.Exchange.Name = name
+	c.Publish.Exchange = name
+	return c
+}
+// Must is like New but panics on error
+func Must(v *viper.Viper) Config {
+	conf, err := New(v)
+	if err != nil {
+		panic(err)
+	}
+	return conf
+}
+
 // New creates a new instance of Config from viper
 func New(v *viper.Viper) (out Config, err error) {
 	out.Queue, err = NewQueue(v)
