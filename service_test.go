@@ -75,8 +75,8 @@ func TestAMQPService_Requeue_Success(t *testing.T) {
 	ch.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			require.Len(t, args, 5)
-			assert.Equal(t, oldMsg.Exchange, args.Get(0))
-			assert.Equal(t, oldMsg.RoutingKey, args.Get(1))
+			assert.Equal(t, conf.Exchange.Name, args.Get(0))
+			assert.Equal(t, conf.QueueName, args.Get(1))
 			assert.Equal(t, conf.Publish.Mandatory, args.Get(2))
 			assert.Equal(t, conf.Publish.Immediate, args.Get(3))
 			assert.Equal(t, newMsg, args.Get(4))

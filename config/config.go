@@ -25,6 +25,7 @@ func (c Config) SetExchangeName(name string) Config {
 	c.Publish.Exchange = name
 	return c
 }
+
 // Must is like New but panics on error
 func Must(v *viper.Viper) Config {
 	conf, err := New(v)

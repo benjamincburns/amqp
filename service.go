@@ -251,8 +251,11 @@ func (as *qpService) requeue(oldMsg amqp.Delivery, newMsg amqp.Publishing) error
 	if err != nil {
 		return err
 	}
-
-	err = ch.Publish(oldMsg.Exchange, oldMsg.RoutingKey, as.conf.Publish.Mandatory, as.conf.Publish.Immediate, newMsg)
+	as.log.WithFields(logrus.Fields{
+		"exchange": as.conf.Publish.Exchange,
+		"key":      as.conf.QueueName,
+	}).Trace("requeuing a message")
+	err = ch.Publish(as.conf.Publish.Exchange, as.conf.QueueName, as.conf.Publish.Mandatory, as.conf.Publish.Immediate, newMsg)
 	if err != nil {
 		ch.TxRollback()
 		return err
@@ -313,7 +316,6 @@ func (as qpService) CreateExchange() error {
 	return ch.ExchangeDeclare(as.conf.Exchange.Name, as.conf.Exchange.Kind, as.conf.Exchange.Durable,
 		as.conf.Exchange.AutoDelete, as.conf.Exchange.Internal, as.conf.Exchange.NoWait, as.conf.Exchange.Args)
 }
-
 
 // GetChannel gets a channel
 func (as qpService) Channel() (externals.AMQPChannel, error) {

@@ -10,17 +10,29 @@ import (
 	"github.com/spf13/viper"
 )
 
-func main() {
-	config.Setup(viper.GetViper())
+func getServ(name string) queue.AMQPService {
 	conf := config.Must(viper.GetViper())
 	conf.Exchange = conf.Exchange.AsXDelay()
-	conf.QueueName = "test"
+	conf.QueueName = name
 	conf = conf.SetExchangeName("xdelay")
 	serv := queue.NewService(conf, log.New())
 	queue.TryCreateQueues(log.New(), serv)
 	queue.BindQueuesToExchange(log.New(), serv)
+	return serv
+}
+
+func main() {
+	config.Setup(viper.GetViper())
+	serv := getServ("test")
 	go listen(serv)
-	send(queue.NewService(conf, log.New())) //give it a different service incase the library has magic
+
+	go send(getServ("test")) //give it a different service incase the library has magic
+
+	serv2 := getServ("test2")
+
+	go listen(serv2)
+
+	send(serv2)
 }
 
 func send(serv queue.AMQPService) {
@@ -60,6 +72,7 @@ func listen(serv queue.AMQPService) {
 	}
 	for msg := range msgs {
 		log.WithField("body", string(msg.Body)).Info("received a message")
+		msg.Ack(false)
 	}
 	log.Panic("channel was closed")
 }

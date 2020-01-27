@@ -74,6 +74,7 @@ func OpenAMQPConnection(conf config.Endpoint) (*amqp.Connection, error) {
 		conf.QueuePort,
 		conf.QueueVHost))
 }
+
 // AutoSetup calls TryCreateQueues and then BindQueuesToExchange
 func AutoSetup(log logrus.Ext1FieldLogger, queues ...AMQPService) {
 	TryCreateQueues(log, queues...)
@@ -107,7 +108,7 @@ func BindQueuesToExchange(log logrus.Ext1FieldLogger, queues ...AMQPService) {
 	errChan := make(chan error)
 	for i := range queues {
 		go func(i int) {
-			ch, err :=  queues[i].Channel()
+			ch, err := queues[i].Channel()
 			if err != nil {
 				errChan <- err
 				return
@@ -118,9 +119,9 @@ func BindQueuesToExchange(log logrus.Ext1FieldLogger, queues ...AMQPService) {
 				errChan <- nil
 				return
 			}
-			errChan <- ch.QueueBind(conf.QueueName, conf.QueueName, conf.Exchange.Name, false ,nil)
+			errChan <- ch.QueueBind(conf.QueueName, conf.QueueName, conf.Exchange.Name, false, nil)
 		}(i)
-		
+
 	}
 	for i := 0; i < len(queues); i++ {
 		err := <-errChan
